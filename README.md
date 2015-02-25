@@ -1,2 +1,2 @@
 # Tic-Tac-Toe-Online
-Task
+Used plugins: tk2d, Photon
