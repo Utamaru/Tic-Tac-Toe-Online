@@ -15,9 +15,9 @@ public class PlaceTiles : MonoBehaviour
         float posY = -unit;
         float deltaPos = unit;
 
-        for (int i = 0; i < Helpers.GridSize.y; i++)
+        for (int i = 0; i < Helpers.GridSize.y; ++i)
         {
-            for (int j = 0; j < Helpers.GridSize.x; j++)
+            for (int j = 0; j < Helpers.GridSize.x; ++j)
             {
                 GameObject tile = GameObject.Instantiate(TilePrefab) as GameObject;
                 Transform tileTransform = tile.transform;

@@ -35,35 +35,24 @@ public class GameplayController : Photon.MonoBehaviour
             {
                 _state = value;
                 string message;
-                if (_state == GameState.WaitingForPlayers)
+
+                PunTeams.Team currentTeam = PhotonNetwork.player.GetTeam();
+
+                if (_state == GameState.WaitingForTurnByX && currentTeam == PunTeams.Team.X ||
+                    _state == GameState.WaitingForTurnByO && currentTeam == PunTeams.Team.O)
                 {
-                    message = "Waiting for another player to join your game";
+                    message = Helpers.GetMessageFromGameState(6);
                 }
-                else if (_state == GameState.WaitingForRestart)
+                else if (_state == GameState.WaitingForTurnByX && currentTeam == PunTeams.Team.O ||
+                         _state == GameState.WaitingForTurnByO && currentTeam == PunTeams.Team.X)
                 {
-                    message = "Waiting for your opponent's response";
-                }
-                else if (_state == GameState.YouWon)
-                {
-                    message = "You won\nPress \"spacebar\" to try to win again";
-                }
-                else if (_state == GameState.YouLost)
-                {
-                    message = "You lost\nPress \"spacebar\" to take revenge";
-                }
-                else if (_state == GameState.Tie)
-                {
-                    message = "It's a tie\nPress \"spacebar\" to rematch";
-                }
-                else if (_state == GameState.WaitingForTurnByX && PhotonNetwork.player.GetTeam() == PunTeams.Team.X ||
-                    _state == GameState.WaitingForTurnByO && PhotonNetwork.player.GetTeam() == PunTeams.Team.O)
-                {
-                    message = "It is your turn";
+                    message = Helpers.GetMessageFromGameState(7);
                 }
                 else
                 {
-                    message = "It is your opponent's turn";
+                    message = Helpers.GetMessageFromGameState(_state);
                 }
+
                 StatusLabel.text = message;
             }
         }
@@ -75,6 +64,17 @@ public class GameplayController : Photon.MonoBehaviour
 
     private bool isPlayerOneReady;
     private bool isPlayerTwoReady;
+
+    #region MonoBehaviour messages
+    private void OnEnable()
+    {
+        Grid.get.OnGameOver += OnGameOver;
+    }
+
+    private void OnDisable()
+    {
+        Grid.get.OnGameOver -= OnGameOver;
+    }
 
     private void Awake()
     {
@@ -96,22 +96,18 @@ public class GameplayController : Photon.MonoBehaviour
             PhotonNetwork.ConnectUsingSettings(Version + "." + Application.loadedLevel);
         }
 
-        if (State == GameState.YouLost || State == GameState.YouWon || State == GameState.Tie)
+        if ((State == GameState.YouLost || State == GameState.YouWon || State == GameState.Tie) && Input.GetKey(KeyCode.Space))
         {
-            if (Input.GetKey(KeyCode.Space))
+            if (!PhotonNetwork.player.isMasterClient)
             {
-                if (!PhotonNetwork.player.isMasterClient)
-                {
-                    photonView.RPC("InformMasterClientToRestart", PhotonTargets.Others);
-                }
-                else
-                {
-                    isPlayerOneReady = true;
-                }
-
-                State = GameState.WaitingForRestart;
+                photonView.RPC("InformMasterClientToRestart", PhotonTargets.Others);
+            }
+            else
+            {
+                isPlayerOneReady = true;
             }
 
+            State = GameState.WaitingForRestart;
         }
 
         if (State == GameState.WaitingForRestart && isPlayerOneReady && isPlayerTwoReady && PhotonNetwork.player.isMasterClient)
@@ -120,8 +116,9 @@ public class GameplayController : Photon.MonoBehaviour
             photonView.RPC("StartGame", PhotonTargets.AllViaServer);
         }
     }
+    #endregion
 
-    #region PhotonEvents
+    #region Photon events
 
     private void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
     {
@@ -172,6 +169,7 @@ public class GameplayController : Photon.MonoBehaviour
 
     #endregion
 
+    #region RPC calls
     [RPC]
     public void StartGame()
     {
@@ -180,10 +178,6 @@ public class GameplayController : Photon.MonoBehaviour
         State = GameState.WaitingForTurnByX;
     }
 
-    public void OnClickTile(PunTeams.Team team, IntVector2 coordinates)
-    {
-        photonView.RPC("PerformTurn", PhotonTargets.AllViaServer, new object[] { team.ToString(), coordinates.x, coordinates.y });
-    }
 
     [RPC]
     public void PerformTurn(string teamName, int x, int y)
@@ -196,8 +190,6 @@ public class GameplayController : Photon.MonoBehaviour
         IntVector2 coordinates = new IntVector2(x, y);
         PunTeams.Team team = Helpers.ParseEnum<PunTeams.Team>(teamName);
 
-        Debug.Log(State + ", " + team + " : " + coordinates.ToString());
-
         if (team == PunTeams.Team.none | State == GameState.WaitingForRestart) return;
 
         if (team == PunTeams.Team.X && State == GameState.WaitingForTurnByX ||
@@ -205,42 +197,16 @@ public class GameplayController : Photon.MonoBehaviour
         {
             if (Grid.get.PerformTurn(coordinates, team))
             {
-                if (State == GameState.WaitingForTurnByX) State = GameState.WaitingForTurnByO;
-                else if (State == GameState.WaitingForTurnByO) State = GameState.WaitingForTurnByX;
+                State = State == GameState.WaitingForTurnByX ? GameState.WaitingForTurnByO : (State == GameState.WaitingForTurnByO ? GameState.WaitingForTurnByX : State);
             }
         }
-    }
-
-    [RPC]
-    public void RestartWithCurrentPlayer()
-    {
-
-    }
-
-    private void OnGameOver(PunTeams.Team team)
-    {
-        photonView.RPC("OnGameOverRPC", PhotonTargets.AllViaServer, new object[] { team.ToString() });
     }
 
     [RPC]
     private void OnGameOverRPC(string teamName)
     {
         PunTeams.Team team = Helpers.ParseEnum<PunTeams.Team>(teamName);
-
-        Debug.Log("winner: " + team.ToString());
-
-        if (team == PunTeams.Team.none)
-        {
-            State = GameState.Tie;
-        }
-        else if (team == PhotonNetwork.player.GetTeam())
-        {
-            State = GameState.YouWon;
-        }
-        else
-        {
-            State = GameState.YouLost;
-        }
+        State = team == PunTeams.Team.none ? GameState.Tie : (team == PhotonNetwork.player.GetTeam() ? GameState.YouWon : GameState.YouLost);
     }
 
     [RPC]
@@ -248,12 +214,18 @@ public class GameplayController : Photon.MonoBehaviour
     {
         isPlayerTwoReady = true;
     }
+    #endregion
 
-    public void ReadyToRestart()
+    public void OnClickTile(PunTeams.Team team, IntVector2 coordinates)
     {
-
+        photonView.RPC("PerformTurn", PhotonTargets.AllViaServer, new object[] { team.ToString(), coordinates.x, coordinates.y });
+    }
+    private void OnGameOver(PunTeams.Team team)
+    {
+        photonView.RPC("OnGameOverRPC", PhotonTargets.AllViaServer, new object[] { team.ToString() });
     }
 
+    #region Debug
     private void OnGUI()
     {
 #if UNITY_EDITOR
@@ -266,14 +238,5 @@ public class GameplayController : Photon.MonoBehaviour
             PhotonNetwork.player.GetTeam()));
 #endif
     }
-
-    private void OnEnable()
-    {
-        Grid.get.OnGameOver += OnGameOver;
-    }
-
-    private void OnDisable()
-    {
-        Grid.get.OnGameOver -= OnGameOver;
-    }
+    #endregion
 }

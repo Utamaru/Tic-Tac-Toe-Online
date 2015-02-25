@@ -56,9 +56,9 @@ public class Grid : MonoBehaviourSingleton<Grid>
     {
         turns = 0;
 
-        for (int i = 0; i < Helpers.GridSize.x; i++)
+        for (int i = 0; i < Helpers.GridSize.x; ++i)
         {
-            for (int j = 0; j < Helpers.GridSize.y; j++)
+            for (int j = 0; j < Helpers.GridSize.y; ++j)
             {
                 tiles[i, j].Clear();
             }
@@ -72,39 +72,20 @@ public class Grid : MonoBehaviourSingleton<Grid>
 
     private bool Victory()
     {
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < 3; ++i)
         {
-            if (VerifyEquality(tiles[i, 0], tiles[i, 1], tiles[i, 2]) |
-                VerifyEquality(tiles[0, i], tiles[1, i], tiles[2, i]))
+            if (IsEqual(tiles[i, 0], tiles[i, 1], tiles[i, 2]) |
+                IsEqual(tiles[0, i], tiles[1, i], tiles[2, i]))
             {
                 return true;
             }
         }
 
-        if (VerifyEquality(tiles[0, 0], tiles[1, 1], tiles[2, 2]))
-        {
-            return true;
-        }
-
-        if (VerifyEquality(tiles[0, 2], tiles[1, 1], tiles[2, 0]))
-        {
-            return true;
-        }
-
-        return false;
+        return IsEqual(tiles[0, 0], tiles[1, 1], tiles[2, 2]) || IsEqual(tiles[0, 2], tiles[1, 1], tiles[2, 0]);
     }
 
-    private bool VerifyEquality(Tile tileOne, Tile tileTwo, Tile tileThree)
+    private bool IsEqual(Tile tileOne, Tile tileTwo, Tile tileThree)
     {
-        if (tileOne.State == TileState.Free)
-        {
-            return false;
-        }
-
-        if ((tileOne.State == tileTwo.State) && (tileOne.State == tileThree.State))
-        {
-            return true;
-        }
-        return false;
+        return (tileOne.State != TileState.Free) && (tileOne.State == tileTwo.State) && (tileOne.State == tileThree.State);
     }
 }
