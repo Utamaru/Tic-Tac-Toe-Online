@@ -169,7 +169,7 @@ public class GameplayController : Photon.MonoBehaviour
 
     #endregion
 
-    #region RPC calls
+    #region RPCs
     [RPC]
     public void StartGame()
     {
